@@ -11,13 +11,14 @@
 import $C = require('collection.js');
 
 import symbolGenerator from 'core/symbol';
-import Async, { AsyncOpts, ClearOptsId, ProxyCb } from 'core/async';
+import Async, { AsyncOpts, ClearOptsId, WrappedFunction, ProxyCb } from 'core/async';
 import log, { LogMessageOptions } from 'core/log';
 
 import * as analytics from 'core/analytics';
 import { EventEmitter2 as EventEmitter } from 'eventemitter2';
 
 import 'super/i-block/directives';
+import Daemons, { DaemonsDict } from 'super/i-block/modules/daemons';
 import Block from 'super/i-block/modules/block';
 import Cache from 'super/i-block/modules/cache';
 
@@ -89,6 +90,7 @@ import * as browser from 'core/browser';
 
 export * from 'core/component';
 export * from 'super/i-block/modules/interface';
+export * from 'super/i-block/modules/daemons';
 
 export { statuses, Cache };
 export {
@@ -176,6 +178,12 @@ export default class iBlock extends ComponentInterface<iBlock, iStaticPage> {
 	 */
 	@prop({type: String, required: false})
 	readonly globalName?: string;
+
+	/**
+	 * If true, then the component state will be synchronized with the router after initializing
+	 */
+	@prop(Boolean)
+	readonly syncRouterStoreOnInit: boolean = false;
 
 	/**
 	 * Link to the remote state object
@@ -599,10 +607,34 @@ export default class iBlock extends ComponentInterface<iBlock, iStaticPage> {
 	};
 
 	/**
+	 * Component daemons
+	 */
+	static readonly daemons: DaemonsDict = {};
+
+	/**
 	 * Wrapper for $refs
 	 */
+	@p({cache: false})
 	protected get refs(): Dictionary<ComponentElement<iBlock> | Element> {
-		return $C(this.$refs).map((el) => (<ComponentElement<any>>el).component || <Element>el);
+		const
+			obj = this.$refs,
+			res = {};
+
+		if (obj) {
+			for (let keys = Object.keys(obj), i = 0; i < keys.length; i++) {
+				const
+					key = keys[i],
+					el = obj[key];
+
+				if (!el) {
+					continue;
+				}
+
+				res[key] = (<ComponentElement>el).component || <Element>el;
+			}
+		}
+
+		return res;
 	}
 
 	/**
@@ -773,6 +805,16 @@ export default class iBlock extends ComponentInterface<iBlock, iStaticPage> {
 	 */
 	@system({unique: true})
 	protected block!: Block;
+
+	/**
+	 * Daemons API
+	 */
+	@system({
+		unique: true,
+		init: (ctx) => new Daemons(ctx)
+	})
+
+	protected daemons!: Daemons;
 
 	/**
 	 * Local event emitter
@@ -1494,14 +1536,14 @@ export default class iBlock extends ComponentInterface<iBlock, iStaticPage> {
 	 * @param cb
 	 * @param [params] - async parameters
 	 */
-	nextTick(cb: ((this: this) => void), params?: AsyncOpts): void;
+	nextTick(cb: WrappedFunction, params?: AsyncOpts): void;
 
 	/**
 	 * @see Async.promise
 	 * @param [params] - async parameters
 	 */
 	nextTick(params?: AsyncOpts): Promise<void>;
-	nextTick(cbOrParams?: Function | AsyncOpts, params?: AsyncOpts): CanPromise<void> {
+	nextTick(cbOrParams?: WrappedFunction | AsyncOpts, params?: AsyncOpts): CanPromise<void> {
 		const
 			{async: $a} = this;
 
@@ -2682,9 +2724,36 @@ export default class iBlock extends ComponentInterface<iBlock, iStaticPage> {
 				p = this.$root.route || {},
 				stateFields = this.convertStateToRouter(Object.assign(Object.create(p), p.params, p.query));
 
-			this.setState(
-				stateFields
-			);
+			this.setState(stateFields);
+
+			const
+				{router} = this.$root;
+
+			if (this.syncRouterStoreOnInit && router) {
+				const
+					currentRoute = this.$root.route || {},
+					routerState = this.convertStateToRouter(stateFields, 'remote');
+
+				if (Object.keys(routerState).length) {
+					const
+						modState = {};
+
+					for (let keys = Object.keys(routerState), i = 0; i < keys.length; i++) {
+						const
+							key = keys[i];
+
+						if (currentRoute.params[key] == null && currentRoute.query[key] == null) {
+							modState[key] = routerState[key];
+						}
+					}
+
+					if (Object.keys(modState).length) {
+						router.replace(null, {
+							query: modState
+						});
+					}
+				}
+			}
 
 			const sync = this.createDeferFn(() => this.saveStateToRouter(), {
 				label: $$.syncRouter
