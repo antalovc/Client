@@ -67,6 +67,7 @@ module.exports = async function ({buildId, plugins}) {
 					loader: 'monic',
 					options: inherit(monic.typescript, {
 						replacers: [
+							include('build/init-module.replacer'),
 							include('build/context.replacer'),
 							include('build/super.replacer'),
 							include('build/ts-import.replacer'),
@@ -90,6 +91,7 @@ module.exports = async function ({buildId, plugins}) {
 					loader: 'monic',
 					options: inherit(monic.typescript, {
 						replacers: [
+							include('build/init-module.replacer'),
 							include('build/context.replacer'),
 							include('build/super.replacer'),
 							include('build/ts-import.replacer'),
@@ -107,6 +109,7 @@ module.exports = async function ({buildId, plugins}) {
 				loader: 'monic',
 				options: inherit(monic.javascript, {
 					replacers: [
+						include('build/init-module.replacer'),
 						include('build/context.replacer'),
 						include('build/super.replacer'),
 						include('build/typograf.replacer')

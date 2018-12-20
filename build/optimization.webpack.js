@@ -70,8 +70,7 @@ module.exports = async function ({buildId, plugins}) {
 				parallel: true,
 				uglifyOptions: inherit(config.uglify(), {
 					compress: {
-						warnings: false,
-						keep_fnames: true
+						warnings: false
 					},
 
 					output: {
