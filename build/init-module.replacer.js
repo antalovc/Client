@@ -13,7 +13,8 @@ const
 
 const
 	link = `V4_MODULES_${Number.random(1e6)}`,
-	skipRgxp = /\/src\/core\/modules.ts$/;
+	skipFileRgxp = /\/src\/core\/modules.ts$/,
+	componentRgxp = /^bgp-/;
 
 /**
  * Monic replacer for module initializing
@@ -23,7 +24,7 @@ const
  * @returns {string}
  */
 module.exports = function (str, file) {
-	if (skipRgxp.test(file)) {
+	if (skipFileRgxp.test(file)) {
 		return str;
 	}
 
@@ -34,10 +35,14 @@ module.exports = function (str, file) {
 		fname = path.basename(path.dirname(file));
 	}
 
+	if (!componentRgxp.test(fname)) {
+		return str;
+	}
+
 	return `
 // @ts-ignore
 import ${link} from 'core/modules';
-${link}.push({name: '${fname}', path: '${file}'});
+${link}.push('${fname}');
 
 ${str}
 ${link}.pop();
